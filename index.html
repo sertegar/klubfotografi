@@ -37,7 +37,7 @@
     -webkit-font-smoothing:antialiased;
   }
   img,svg{display:block;}
-  button{font-family:inherit;}
+  button{font-family:inherit;color:inherit;}
 
   a{color:inherit;}
   :focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
@@ -236,8 +236,10 @@
     width:52px;height:52px;border-radius:50%;border:1px solid var(--ink);
     display:flex;align-items:center;justify-content:center;
     font-weight:bold;font-size:16px;margin-bottom:12px;background:var(--paper-dim);
+    color:var(--ink);
   }
-  .member-name{font-weight:bold;font-size:14.5px;margin-bottom:2px;}
+  .member-card{color:var(--ink);}
+  .member-name{font-weight:bold;font-size:14.5px;margin-bottom:2px;color:var(--ink);}
   .member-role{font-size:11px;color:var(--ink-60);margin-bottom:10px;}
   .genre-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;}
   .tag{
@@ -369,6 +371,33 @@
     .stat-row{grid-template-columns:1fr;}
     .stat{border-left:none !important;border-top:1px solid var(--ink-15);}
     .stat:first-child{border-top:none;}
+
+    .top-inner{padding:10px 14px 8px;gap:10px;}
+    .logo-mark{width:36px;height:36px;}
+    .brand-text .name{font-size:14px;}
+    .brand-text .school{font-size:9.5px;}
+    .auth-box .btn{padding:7px 10px;font-size:10.5px;}
+    .user-chip{font-size:11px;gap:6px;}
+
+    nav.dial{padding:0 8px;gap:0;}
+    nav.dial button{padding:9px 10px 10px;font-size:10.5px;letter-spacing:.8px;}
+
+    main{padding:24px 14px 60px;}
+    .hero h1{font-size:28px;}
+    .home-grid{gap:12px;}
+
+    .member-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+    .member-card{padding:14px 12px;}
+
+    .overlay{padding:0;align-items:stretch;}
+    .modal{max-width:100%;min-height:100vh;padding:20px 18px 30px;border:none;}
+
+    .claim-card{grid-template-columns:64px 1fr;}
+    .claim-thumb{width:64px;height:64px;}
+    .claim-actions{flex-direction:row;grid-column:1 / -1;margin-top:6px;}
+
+    .badge-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
+    .modal-badges{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
   }
 </style>
 </head>
@@ -384,7 +413,6 @@
       <div class="name" id="clubNameHeader">Klub Fotografi Wima</div>
       <div class="school" id="schoolNameHeader">SMK Wiyata Mandala Bogor</div>
     </div>
-    <div class="exif" id="exifLine"></div>
     <div class="auth-box" id="authBox"></div>
   </div>
   <nav class="dial" id="navDial">
@@ -395,7 +423,6 @@
     <button data-view="klaim" id="navKlaim" style="display:none;">Ajukan Lencana</button>
     <button data-view="admin" id="navAdmin" style="display:none;">Panel Admin</button>
   </nav>
-  <div class="sprocket dense"></div>
 </header>
 
 <main>
@@ -440,6 +467,14 @@
     <h1 class="page-title">Anggota</h1>
     <p class="page-sub">Klik salah satu anggota untuk lihat genre favorit dan lencana yang sudah dikumpulkan.</p>
     <div class="member-grid" id="memberGrid"></div>
+  </section>
+
+  <!-- ============================================================
+       VIEW: PROFIL ANGGOTA (halaman khusus, bukan popup)
+       ============================================================ -->
+  <section class="view" id="view-profil">
+    <button class="btn ghost small" id="backToAnggota">← Kembali ke Anggota</button>
+    <div id="profilBody" style="margin-top:22px;max-width:640px;"></div>
   </section>
 
   <!-- ============================================================
@@ -490,14 +525,6 @@
 </main>
 
 <footer id="footerText"></footer>
-
-<!-- Modal detail anggota -->
-<div class="overlay" id="modalOverlay">
-  <div class="modal">
-    <button class="modal-close" id="modalClose" aria-label="Tutup">✕</button>
-    <div id="modalBody"></div>
-  </div>
-</div>
 
 <!-- Modal login -->
 <div class="overlay" id="loginOverlay">
@@ -624,9 +651,6 @@ function renderIdentity(){
   document.getElementById("heroTitle").textContent = CLUB.name;
   document.title = CLUB.name + " — " + CLUB.school;
   document.getElementById("footerText").textContent = CLUB.name + " · " + CLUB.school;
-
-  document.getElementById("exifLine").innerHTML =
-    `<span>ANGGOTA <b>${DATA.members.length}</b></span><span>LENCANA <b>${DATA.badges.length}</b></span><span>PERTEMUAN KE- <b>${DATA.meetings.length}</b></span>`;
 
   document.getElementById("logoMark").src = LOGO_SRC;
   document.getElementById("heroPhoto").src = FOTO_SRC;
@@ -766,11 +790,11 @@ function renderAnggota(){
   `).join("");
 
   document.querySelectorAll(".member-card").forEach(card=>{
-    card.addEventListener("click", ()=> openMemberModal(DATA.members[card.dataset.index]));
+    card.addEventListener("click", ()=> openMemberProfile(DATA.members[card.dataset.index]));
   });
 }
 
-function openMemberModal(member){
+function openMemberProfile(member){
   modalMember = member;
   const earned = member.badges.map(item=>{
     const info = DATA.badges.find(b=>b.id===item.id_lencana);
@@ -779,7 +803,7 @@ function openMemberModal(member){
 
   const isOwner = currentUser && String(currentUser.id) === String(member.id);
 
-  document.getElementById("modalBody").innerHTML = `
+  document.getElementById("profilBody").innerHTML = `
     ${member.foto_profil_url ? `<img src="${member.foto_profil_url}" class="avatar" style="object-fit:cover;">` : `<div class="avatar">${initials(member.nama)}</div>`}
     <div class="modal-name">${member.nama}</div>
     <div class="modal-role">${member.role}</div>
@@ -796,7 +820,7 @@ function openMemberModal(member){
     </div>
     ${isOwner ? `<div class="form-actions"><button class="btn small" id="editProfileBtn">Edit Profil Saya</button></div>` : ""}
   `;
-  document.getElementById("modalOverlay").classList.add("active");
+  showView("profil");
 
   document.querySelectorAll("#modalBadgeChips .b-chip").forEach(chip=>{
     chip.addEventListener("click", ()=> openBadgeProof(earned[chip.dataset.i]));
@@ -807,28 +831,23 @@ function openMemberModal(member){
 }
 
 function openBadgeProof(badge){
-  document.getElementById("modalBody").innerHTML = `
+  document.getElementById("profilBody").innerHTML = `
     <button class="btn ghost small" id="backToProfile">← Kembali ke profil</button>
     <div class="modal-section-label" style="margin-top:16px;">${badge.nama} · ${RARITY_LABEL[badge.rarity] || badge.rarity}</div>
     ${badge.foto_bukti_url ? `<img src="${badge.foto_bukti_url}" style="width:100%;border:1px solid var(--ink-35);margin:10px 0;">` : `<div class="empty-note" style="margin:10px 0;">Foto bukti tidak tersedia.</div>`}
     <div style="font-size:12px;color:var(--ink-60);">Didapat pada ${badge.tanggal || "-"}</div>
     <div style="font-size:13px;margin-top:10px;line-height:1.5;">${badge.deskripsi || ""}</div>
   `;
-  document.getElementById("backToProfile").addEventListener("click", ()=> openMemberModal(modalMember));
+  document.getElementById("backToProfile").addEventListener("click", ()=> openMemberProfile(modalMember));
 }
 
-document.getElementById("modalClose").addEventListener("click", ()=>{
-  document.getElementById("modalOverlay").classList.remove("active");
-});
-document.getElementById("modalOverlay").addEventListener("click", (e)=>{
-  if(e.target.id === "modalOverlay") document.getElementById("modalOverlay").classList.remove("active");
-});
+document.getElementById("backToAnggota").addEventListener("click", ()=> showView("anggota"));
 
 /* ================================================================
    EDIT PROFIL — genre & foto profil, khusus pemilik profil
    ================================================================ */
 function openEditProfileForm(member){
-  document.getElementById("modalBody").innerHTML = `
+  document.getElementById("profilBody").innerHTML = `
     <button class="btn ghost small" id="backToProfile2">← Batal, kembali ke profil</button>
     <div class="modal-section-label" style="margin-top:16px;">Edit Profil</div>
     <div class="field">
@@ -873,7 +892,7 @@ function openEditProfileForm(member){
     reader.readAsDataURL(file);
   });
 
-  document.getElementById("backToProfile2").addEventListener("click", ()=> openMemberModal(modalMember));
+  document.getElementById("backToProfile2").addEventListener("click", ()=> openMemberProfile(modalMember));
 
   document.getElementById("saveProfileBtn").addEventListener("click", async ()=>{
     const msg = document.getElementById("profileMsg");
@@ -886,7 +905,7 @@ function openEditProfileForm(member){
         msg.className = "form-msg show ok"; msg.textContent = "Tersimpan.";
         await loadPublicData();
         const refreshed = DATA.members.find(m=>String(m.id)===String(member.id)) || member;
-        setTimeout(()=> openMemberModal(refreshed), 500);
+        setTimeout(()=> openMemberProfile(refreshed), 500);
       }else{
         msg.className = "form-msg show err"; msg.textContent = result.error || "Gagal menyimpan.";
       }
@@ -1021,15 +1040,20 @@ async function loadAdminPanel(){
 /* ================================================================
    NAVIGASI antar-halaman
    ================================================================ */
+function showView(viewName){
+  document.querySelectorAll("nav.dial button").forEach(b=>b.classList.remove("active"));
+  const navBtn = document.querySelector(`nav.dial button[data-view="${viewName}"]`);
+  if(navBtn) navBtn.classList.add("active");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("view-"+viewName).classList.add("active");
+  window.scrollTo({top:0, behavior:"auto"});
+  if(viewName === "admin") loadAdminPanel();
+}
+
 document.getElementById("navDial").addEventListener("click", (e)=>{
   const btn = e.target.closest("button[data-view]");
   if(!btn) return;
-  document.querySelectorAll("nav.dial button").forEach(b=>b.classList.remove("active"));
-  btn.classList.add("active");
-  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
-  document.getElementById("view-"+btn.dataset.view).classList.add("active");
-  window.scrollTo({top:0, behavior:"auto"});
-  if(btn.dataset.view === "admin") loadAdminPanel();
+  showView(btn.dataset.view);
 });
 
 /* ================================================================
