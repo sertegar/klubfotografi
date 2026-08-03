@@ -1024,7 +1024,7 @@ document.getElementById("claimSubmitBtn").addEventListener("click", async ()=>{
    ================================================================ */
 async function loadAdminPanel(){
   const list = document.getElementById("adminClaimList");
-  if(!currentUser || (currentUser.role !== "admin" && currentUser.role !== "pembina")){
+  if(!currentUser || currentUser.hak_akses !== "admin"){
     list.innerHTML = `<div class="empty-note">Halaman ini khusus admin/pembina.</div>`;
     return;
   }
