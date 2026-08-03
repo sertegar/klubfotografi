@@ -352,6 +352,20 @@
 
   .empty-note{font-size:13px;color:var(--ink-60);border:1px solid var(--ink-15);padding:20px;text-align:center;}
 
+  .loading-note{
+    font-size:13px;color:var(--ink-60);padding:26px 20px;text-align:center;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+  }
+  .spinner{
+    width:16px;height:16px;border-radius:50%;flex:0 0 auto;
+    border:2px solid var(--ink-15);border-top-color:var(--ink-60);
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion: reduce){
+    .spinner{animation:none;}
+  }
+
   /* ============================================================
      PANEL ADMIN
      ============================================================ */
@@ -444,9 +458,13 @@
       </div>
     </div>
 
-    <div class="stat-row" id="statRow"></div>
+    <div class="stat-row" id="statRow">
+      <div class="loading-note" style="grid-column:1/-1;padding:14px;"><span class="spinner"></span>Memuat...</div>
+    </div>
 
-    <div class="home-grid" id="homeShortcuts"></div>
+    <div class="home-grid" id="homeShortcuts">
+      <div class="loading-note" style="grid-column:1/-1;"><span class="spinner"></span>Memuat data...</div>
+    </div>
   </section>
 
   <!-- ============================================================
@@ -456,7 +474,9 @@
     <p class="eyebrow">Rekam Jejak Latihan</p>
     <h1 class="page-title">Progress Ekskul</h1>
     <p class="page-sub">Catatan tiap pertemuan: materi yang diajarkan, dan status latihan.</p>
-    <div class="roll" id="meetingRoll"></div>
+    <div class="roll" id="meetingRoll">
+      <div class="loading-note"><span class="spinner"></span>Memuat progress...</div>
+    </div>
   </section>
 
   <!-- ============================================================
@@ -466,7 +486,9 @@
     <p class="eyebrow">Kontak Sheet Anggota</p>
     <h1 class="page-title">Anggota</h1>
     <p class="page-sub">Klik salah satu anggota untuk lihat genre favorit dan lencana yang sudah dikumpulkan.</p>
-    <div class="member-grid" id="memberGrid"></div>
+    <div class="member-grid" id="memberGrid">
+      <div class="loading-note" style="grid-column:1/-1;"><span class="spinner"></span>Memuat data anggota...</div>
+    </div>
   </section>
 
   <!-- ============================================================
@@ -485,7 +507,9 @@
     <h1 class="page-title">Katalog Lencana</h1>
     <p class="page-sub">Lencana didapat dari memotret objek tertentu, dikelompokkan per kategori dan tingkat kelangkaan (rarity).</p>
     <div class="rarity-legend" id="rarityLegend"></div>
-    <div id="badgeCategories"></div>
+    <div id="badgeCategories">
+      <div class="loading-note"><span class="spinner"></span>Memuat katalog lencana...</div>
+    </div>
   </section>
 
   <!-- ============================================================
@@ -557,7 +581,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbxt_SehPHo129z-UonWeKuT
 const CLUB = { name: "Klub Fotografi Wima", school: "SMK Wiyata Mandala Bogor" };
 
 // Genre yang bisa dipilih anggota saat edit profil — bebas ditambah/dikurangi
-const ALL_GENRES = ["Landscape", "Street", "Portrait", "Automotive", "Wildlife", "Architecture", "Landmark", "Golden Hour"];
+const ALL_GENRES = ["Street", "Human Interest", "Portrait", "Automotive", "Aviation", "Wildlife", "Landscape", "Nature", "Sky", "Moon", "Sunset", "Sunrise", "Toys"];
 
 let DATA = { meetings: [], badges: [], members: [] };
 let currentUser = null; // { id, nama, username, pin, role, genres, foto_profil_url } — hanya di memori (hilang saat refresh)
@@ -1060,6 +1084,7 @@ document.getElementById("navDial").addEventListener("click", (e)=>{
    INIT
    ================================================================ */
 renderIdentity();
+refreshAuthUI();
 loadPublicData();
 
 </script>
