@@ -617,6 +617,13 @@ function initials(name){
   return (name || "?").split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 }
 
+/* Minta ukuran lain dari URL thumbnail Drive yang sama (hemat bandwidth di grid/avatar kecil,
+   tetap tajam di tampilan foto bukti lencana yang lebih besar). */
+function thumbSize(url, size){
+  if(!url) return url;
+  return url.replace(/sz=w\d+/, `sz=w${size}`);
+}
+
 /* ================================================================
    API HELPERS
    Catatan penting: fetch POST di bawah ini SENGAJA tidak diberi
@@ -805,7 +812,7 @@ function renderAnggota(){
   }
   document.getElementById("memberGrid").innerHTML = DATA.members.map((m,i)=>`
     <button class="member-card" data-index="${i}">
-      ${m.foto_profil_url ? `<img src="${m.foto_profil_url}" class="avatar" style="object-fit:cover;">` : `<div class="avatar">${initials(m.nama)}</div>`}
+      ${m.foto_profil_url ? `<img src="${thumbSize(m.foto_profil_url,150)}" class="avatar" style="object-fit:cover;">` : `<div class="avatar">${initials(m.nama)}</div>`}
       <div class="member-name">${m.nama}</div>
       <div class="member-role">${m.role}</div>
       <div class="genre-tags">${m.genres.map(g=>`<span class="tag">${g}</span>`).join("")}</div>
@@ -828,7 +835,7 @@ function openMemberProfile(member){
   const isOwner = currentUser && String(currentUser.id) === String(member.id);
 
   document.getElementById("profilBody").innerHTML = `
-    ${member.foto_profil_url ? `<img src="${member.foto_profil_url}" class="avatar" style="object-fit:cover;">` : `<div class="avatar">${initials(member.nama)}</div>`}
+    ${member.foto_profil_url ? `<img src="${thumbSize(member.foto_profil_url,300)}" class="avatar" style="object-fit:cover;">` : `<div class="avatar">${initials(member.nama)}</div>`}
     <div class="modal-name">${member.nama}</div>
     <div class="modal-role">${member.role}</div>
     <div class="modal-section-label">Genre Favorit</div>
@@ -858,7 +865,7 @@ function openBadgeProof(badge){
   document.getElementById("profilBody").innerHTML = `
     <button class="btn ghost small" id="backToProfile">← Kembali ke profil</button>
     <div class="modal-section-label" style="margin-top:16px;">${badge.nama} · ${RARITY_LABEL[badge.rarity] || badge.rarity}</div>
-    ${badge.foto_bukti_url ? `<img src="${badge.foto_bukti_url}" style="width:100%;border:1px solid var(--ink-35);margin:10px 0;">` : `<div class="empty-note" style="margin:10px 0;">Foto bukti tidak tersedia.</div>`}
+    ${badge.foto_bukti_url ? `<img src="${thumbSize(badge.foto_bukti_url,1000)}" style="width:100%;border:1px solid var(--ink-35);margin:10px 0;">` : `<div class="empty-note" style="margin:10px 0;">Foto bukti tidak tersedia.</div>`}
     <div style="font-size:12px;color:var(--ink-60);">Didapat pada ${badge.tanggal || "-"}</div>
     <div style="font-size:13px;margin-top:10px;line-height:1.5;">${badge.deskripsi || ""}</div>
   `;
@@ -1035,7 +1042,7 @@ async function loadAdminPanel(){
     if(!result.claims.length){ list.innerHTML = `<div class="empty-note">Tidak ada klaim yang menunggu review.</div>`; return; }
     list.innerHTML = result.claims.map(c=>`
       <div class="claim-card">
-        <img class="claim-thumb" src="${c.foto_bukti_url}" alt="Foto bukti">
+        <img class="claim-thumb" src="${thumbSize(c.foto_bukti_url,200)}" alt="Foto bukti">
         <div class="claim-info">
           <div class="name">${c.nama_anggota} → ${c.nama_lencana}</div>
           <div class="meta">${RARITY_LABEL[c.rarity] || c.rarity} · diajukan ${c.tanggal}</div>
