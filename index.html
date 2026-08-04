@@ -701,20 +701,43 @@ function thumbSize(url, size){
    "simple request" dan tidak memicu preflight CORS yang bikin
    Apps Script Web App gagal merespons. Jangan tambah header.
    ================================================================ */
+/* Apps Script kadang lambat "bangun" (cold start) atau balikin halaman HTML
+   sesaat kalau baru dipanggil setelah lama idle / baru saja di-deploy ulang.
+   Wrapper ini otomatis coba ulang beberapa kali dengan jeda sebelum benar-benar
+   dianggap gagal, supaya user tidak lihat error padahal cukup nunggu sebentar. */
+async function fetchWithRetry(url, options, attempts = 3, delayMs = 1200){
+  let lastErr;
+  for(let i = 0; i < attempts; i++){
+    try{
+      const res = await fetch(url, options);
+      const text = await res.text();
+      try{
+        return JSON.parse(text);
+      }catch(parseErr){
+        // Respons bukan JSON (misal halaman HTML dari Google) -> anggap gagal, coba lagi
+        throw new Error("Respons server bukan JSON (percobaan " + (i+1) + "/" + attempts + ")");
+      }
+    }catch(err){
+      lastErr = err;
+      if(i < attempts - 1) await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 async function apiGet(action){
   const url = `${API_URL}?action=${encodeURIComponent(action)}`;
-  const res = await fetch(url);
-  return res.json();
+  return fetchWithRetry(url);
 }
 async function apiPost(payload){
-  const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-  return res.json();
+  return fetchWithRetry(API_URL, { method: "POST", body: JSON.stringify(payload) });
 }
 
 /* ================================================================
    MUAT DATA PUBLIK dari Sheet (lewat Apps Script)
    ================================================================ */
 async function loadPublicData(){
+  showLoading();
   try{
     const result = await apiGet("getData");
     if(!result.ok){ showLoadError(result.error || "Gagal memuat data."); return; }
@@ -729,16 +752,22 @@ async function loadPublicData(){
     renderClaimBadgeOptions();
     refreshAuthUI();
   }catch(err){
-    showLoadError(String(err));
+    showLoadError(String(err.message || err));
   }
+}
+
+function showLoading(){
+  document.querySelector("main").innerHTML = `
+    <div class="empty-note">Memuat data dari server, mohon tunggu sebentar…</div>`;
 }
 
 function showLoadError(msg){
   document.querySelector("main").innerHTML = `
     <div class="empty-note">
-      Gagal memuat data dari server.<br><br>
-      Kalau ini pertama kali dijalankan: pastikan <code>API_URL</code> di bagian atas kode sudah diisi
-      dengan URL Web App dari Apps Script (lihat PANDUAN-SETUP.md).<br><br>
+      Gagal memuat data dari server setelah beberapa kali percobaan.<br><br>
+      Ini biasanya karena koneksi lagi lambat/putus-putus, atau server Google Apps Script
+      lagi lama "bangun". Coba tekan tombol di bawah ini.<br><br>
+      <button onclick="loadPublicData()" style="padding:8px 16px;cursor:pointer;">Coba lagi</button><br><br>
       <span style="color:var(--ink-35);">Detail teknis: ${msg}</span>
     </div>`;
 }
