@@ -737,7 +737,6 @@ async function apiPost(payload){
    MUAT DATA PUBLIK dari Sheet (lewat Apps Script)
    ================================================================ */
 async function loadPublicData(){
-  showLoading();
   try{
     const result = await apiGet("getData");
     if(!result.ok){ showLoadError(result.error || "Gagal memuat data."); return; }
@@ -756,18 +755,13 @@ async function loadPublicData(){
   }
 }
 
-function showLoading(){
-  document.querySelector("main").innerHTML = `
-    <div class="empty-note">Memuat data dari server, mohon tunggu sebentar…</div>`;
-}
-
 function showLoadError(msg){
   document.querySelector("main").innerHTML = `
     <div class="empty-note">
       Gagal memuat data dari server setelah beberapa kali percobaan.<br><br>
       Ini biasanya karena koneksi lagi lambat/putus-putus, atau server Google Apps Script
       lagi lama "bangun". Coba tekan tombol di bawah ini.<br><br>
-      <button onclick="loadPublicData()" style="padding:8px 16px;cursor:pointer;">Coba lagi</button><br><br>
+      <button onclick="location.reload()" style="padding:8px 16px;cursor:pointer;">Coba lagi</button><br><br>
       <span style="color:var(--ink-35);">Detail teknis: ${msg}</span>
     </div>`;
 }
