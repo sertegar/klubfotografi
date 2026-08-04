@@ -293,7 +293,8 @@
   .badge-category summary::-webkit-details-marker{display:none;}
   .badge-category summary::after{content:"+";font-size:16px;color:var(--ink-60);}
   .badge-category[open] summary::after{content:"–";}
-  .badge-category summary .cat-count{font-weight:normal;color:var(--ink-60);text-transform:none;letter-spacing:0;margin-left:6px;}
+  .badge-category summary .cat-title{display:inline-flex;align-items:baseline;gap:6px;}
+  .badge-category summary .cat-count{font-weight:normal;color:var(--ink-60);text-transform:none;letter-spacing:0;}
   .badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;padding:4px 16px 18px;}
   .badge-card{
     border:1px solid var(--ink-15);padding:18px 10px 16px;text-align:center;
@@ -1097,7 +1098,7 @@ function applyLencanaFilter(){
     if(!items.length) return "";
     return `
     <details class="badge-category" ${isFiltering ? "open" : ""}>
-      <summary>${cat}<span class="cat-count">(${items.length})</span></summary>
+      <summary><span class="cat-title">${cat}<span class="cat-count">(${items.length})</span></span></summary>
       <div class="badge-grid">
         ${items.map(b=>`
           <div class="badge-card ${b.rarity}">
