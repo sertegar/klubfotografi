@@ -226,18 +226,20 @@
   /* ============================================================
      ANGGOTA
      ============================================================ */
-  .member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}
+  .member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;align-items:stretch;}
   .member-card{
     border:1px solid var(--ink-15);padding:18px 16px;cursor:pointer;text-align:left;
     background:var(--paper);width:100%;
+    display:flex;flex-direction:column;
   }
   .member-card:hover{border-color:var(--ink);}
   .avatar{
     width:52px;height:52px;border-radius:50%;border:1px solid var(--ink);
     display:flex;align-items:center;justify-content:center;
     font-weight:bold;font-size:16px;margin-bottom:12px;background:var(--paper-dim);
-    color:var(--ink);
+    color:var(--ink);flex:0 0 auto;
   }
+  img.avatar{display:block;}
   .member-card{color:var(--ink);}
   .level-pill{
     display:inline-block;font-size:10px;font-weight:bold;letter-spacing:.5px;
@@ -253,7 +255,8 @@
     font-size:10px;letter-spacing:.4px;text-transform:uppercase;
     border:1px solid var(--ink-35);padding:2px 7px;color:var(--ink-60);
   }
-  .badge-count{font-size:11.5px;color:var(--ink-60);border-top:1px solid var(--ink-15);padding-top:10px;}
+  .tag-more{color:var(--ink-35);}
+  .badge-count{font-size:11.5px;color:var(--ink-60);border-top:1px solid var(--ink-15);padding-top:10px;margin-top:auto;}
   .badge-count b{color:var(--ink);}
 
   /* Modal detail anggota */
@@ -517,6 +520,7 @@
         <option value="level_desc">Level: Tertinggi</option>
         <option value="level_asc">Level: Terendah</option>
         <option value="nama">Nama (A-Z)</option>
+        <option value="genre">Genre (A-Z)</option>
       </select>
     </div>
     <div class="member-grid" id="memberGrid">
@@ -916,6 +920,11 @@ function applyAnggotaFilter(){
     if(anggotaFilter.sort === "level_desc") return b.points - a.points;
     if(anggotaFilter.sort === "level_asc") return a.points - b.points;
     if(anggotaFilter.sort === "nama") return a.nama.localeCompare(b.nama);
+    if(anggotaFilter.sort === "genre"){
+      const ga = a.genres[0] || "\uffff";
+      const gb = b.genres[0] || "\uffff";
+      return ga.localeCompare(gb) || a.nama.localeCompare(b.nama);
+    }
     return 0;
   });
 
@@ -924,15 +933,18 @@ function applyAnggotaFilter(){
     return;
   }
 
+  const MAX_GENRE_TAGS = 3;
   document.getElementById("memberGrid").innerHTML = list.map(m=>{
     const realIndex = DATA.members.indexOf(m);
+    const shownGenres = m.genres.slice(0, MAX_GENRE_TAGS);
+    const extraGenres = m.genres.length - shownGenres.length;
     return `
     <button class="member-card" data-index="${realIndex}">
       ${m.foto_profil_url ? `<img src="${thumbSize(m.foto_profil_url,150)}" class="avatar" style="object-fit:cover;">` : `<div class="avatar">${initials(m.nama)}</div>`}
-      <div class="level-pill">LV.${m.level} · ${m.level_name}</div>
+      <div class="level-pill">${m.level_name}</div>
       <div class="member-name">${m.nama}</div>
       <div class="member-role">${m.role}</div>
-      <div class="genre-tags">${m.genres.map(g=>`<span class="tag">${g}</span>`).join("")}</div>
+      <div class="genre-tags">${shownGenres.map(g=>`<span class="tag">${g}</span>`).join("")}${extraGenres > 0 ? `<span class="tag tag-more">+${extraGenres}</span>` : ""}</div>
       <div class="badge-count"><b>${m.badges.length}</b> / ${DATA.badges.length} lencana · ${m.points} poin</div>
     </button>`;
   }).join("");
@@ -962,7 +974,7 @@ function openMemberProfile(member){
 
   document.getElementById("profilBody").innerHTML = `
     ${member.foto_profil_url ? `<img src="${thumbSize(member.foto_profil_url,300)}" class="avatar" style="object-fit:cover;">` : `<div class="avatar">${initials(member.nama)}</div>`}
-    <div class="level-pill">LV.${member.level} · ${member.level_name}</div>
+    <div class="level-pill">${member.level_name}</div>
     <div class="modal-name">${member.nama}</div>
     <div class="modal-role">${member.role}</div>
     <div class="modal-section-label">Level & Poin</div>
