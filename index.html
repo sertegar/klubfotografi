@@ -339,6 +339,8 @@
     .badge-card.super .badge-icon,.badge-card.ultra .badge-icon{animation:none;}
   }
   .badge-title{font-size:12.5px;font-weight:bold;line-height:1.3;}
+  .claim-count{font-size:10px;color:var(--ink-60);margin-top:5px;}
+  .badge-card:hover{border-color:var(--ink-35);}
 
   .b-chip{
     display:flex;align-items:center;gap:8px;border:1px solid var(--ink-15);padding:7px 9px;font-size:11px;
@@ -573,6 +575,13 @@
     <div id="badgeCategories">
       <div class="loading-note"><span class="spinner"></span>Memuat katalog lencana...</div>
     </div>
+  </section>
+
+  <!-- ============================================================
+       VIEW: DETAIL LENCANA (galeri semua yang klaim, diakses dari Katalog)
+       ============================================================ -->
+  <section class="view" id="view-lencana-detail">
+    <div id="lencanaDetailBody" style="max-width:640px;"></div>
   </section>
 
   <!-- ============================================================
@@ -1301,16 +1310,67 @@ function applyLencanaFilter(){
     <details class="badge-category" ${isFiltering ? "open" : ""}>
       <summary><span class="cat-title">${cat}<span class="cat-count">(${items.length})</span></span></summary>
       <div class="badge-grid">
-        ${items.map(b=>`
-          <div class="badge-card ${b.rarity}">
+        ${items.map(b=>{
+          const claims = getBadgeClaims(b.id);
+          return `
+          <div class="badge-card ${b.rarity}" data-badge-id="${b.id}" style="cursor:pointer;">
             <div class="rarity-label">${RARITY_LABEL[b.rarity] || b.rarity}</div>
             <div class="badge-icon">${svgIcon(b.kategori,b.rarity,26)}</div>
             <div class="badge-title">${b.nama}</div>
-          </div>
-        `).join("")}
+            <div class="claim-count">${claims.length ? `Diklaim ${claims.length}x` : "Belum ada yang klaim"}</div>
+          </div>`;
+        }).join("")}
       </div>
     </details>`;
   }).join("");
+
+  document.querySelectorAll("#badgeCategories .badge-card").forEach(card=>{
+    card.addEventListener("click", ()=>{
+      const badge = DATA.badges.find(b=>String(b.id)===card.dataset.badgeId);
+      if(badge) openLencanaDetail(badge);
+    });
+  });
+}
+
+/* Kumpulin semua klaim (dari semua anggota) untuk satu id lencana tertentu —
+   dipakai buat hitungan "diklaim Xx" dan galeri di halaman detail lencana. */
+function getBadgeClaims(badgeId){
+  const claims = [];
+  DATA.members.forEach(m=>{
+    m.badges.forEach(item=>{
+      if(String(item.id_lencana) === String(badgeId)){
+        claims.push({ nama: m.nama, foto_bukti_url: item.foto_bukti_url, tanggal: item.tanggal });
+      }
+    });
+  });
+  return claims;
+}
+
+function openLencanaDetail(badge){
+  const claims = getBadgeClaims(badge.id);
+  document.getElementById("lencanaDetailBody").innerHTML = `
+    <button class="btn ghost small" id="backToLencana">← Kembali ke Lencana</button>
+    <div class="modal-section-label" style="margin-top:16px;">${badge.kategori}</div>
+    <div class="modal-name">${badge.nama}</div>
+    <div class="modal-role">${RARITY_LABEL[badge.rarity] || badge.rarity} · ${claims.length ? `Diklaim ${claims.length}x` : "Belum ada yang klaim"}</div>
+    ${badge.deskripsi ? `<div style="font-size:13px;margin-top:10px;line-height:1.5;">${badge.deskripsi}</div>` : ""}
+    <div class="modal-section-label">Foto Klaim</div>
+    ${claims.length ? `
+      <div class="proof-gallery">
+        ${claims.map(c=>`
+          <div class="proof-item">
+            <img src="${thumbSize(c.foto_bukti_url,600)}" data-full="${thumbSize(c.foto_bukti_url,1600)}">
+            <div class="proof-date">${c.nama}${c.tanggal ? ` · ${c.tanggal}` : ""}</div>
+          </div>
+        `).join("")}
+      </div>
+    ` : `<div class="empty-note" style="margin:10px 0;">Belum ada anggota yang mengklaim lencana ini.</div>`}
+  `;
+  showView("lencana-detail");
+  document.getElementById("backToLencana").addEventListener("click", ()=> showView("lencana"));
+  document.querySelectorAll("#lencanaDetailBody .proof-item img").forEach(img=>{
+    img.addEventListener("click", ()=> openImageLightbox(img.dataset.full));
+  });
 }
 
 document.getElementById("lencanaSearch").addEventListener("input", (e)=>{
