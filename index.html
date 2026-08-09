@@ -167,6 +167,11 @@
   .hero-frame .c3{bottom:-1px;left:-1px;border-right:none;border-top:none;}
   .hero-frame .c4{bottom:-1px;right:-1px;border-left:none;border-top:none;}
   .hero-frame .logo-mark{width:100px;height:100px;}
+  .hero-slide{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0;transition:opacity 1s ease;}
+  .hero-slide.active{opacity:1;z-index:1;}
+  .hero-dots{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:3;}
+  .hero-dots .dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45);cursor:pointer;border:none;padding:0;}
+  .hero-dots .dot.active{background:#FFFFFF;}
 
   .stat-row{
     display:grid;grid-template-columns:repeat(2,1fr);
@@ -457,6 +462,33 @@
     .badge-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
     .modal-badges{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
   }
+
+  /* ============================================================
+     KARTU ANGGOTA — cuma tampil pas dicetak (Ctrl+P)
+     ============================================================ */
+  .print-only{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printCard, #printCard *{visibility:visible;}
+    #printCard{display:block;position:fixed;top:0;left:0;width:100%;}
+    .id-card{
+      width:85.6mm;height:54mm;margin:25mm auto;
+      border:1px solid #333333;border-radius:3mm;
+      padding:4mm;box-sizing:border-box;
+      font-family:Tahoma,sans-serif;color:#333333;background:#FFFFFF;
+      display:flex;flex-direction:column;justify-content:space-between;
+    }
+    .id-card-header{display:flex;align-items:center;gap:2mm;border-bottom:0.3mm solid #cccccc;padding-bottom:2mm;}
+    .id-card-logo{width:8mm;height:8mm;border-radius:50%;}
+    .id-card-club{font-size:9pt;font-weight:bold;line-height:1.2;}
+    .id-card-school{font-size:6pt;color:#666666;line-height:1.2;}
+    .id-card-body{display:flex;gap:4mm;align-items:center;flex:1;}
+    .id-card-photo{width:20mm;height:20mm;border-radius:50%;object-fit:cover;border:0.4mm solid #333333;}
+    .id-card-name{font-size:12pt;font-weight:bold;line-height:1.25;}
+    .id-card-role{font-size:8pt;color:#666666;margin-top:1mm;}
+    .id-card-level{font-size:7.5pt;margin-top:2mm;border:0.3mm solid #333333;display:inline-block;padding:0.8mm 2mm;border-radius:2mm;}
+    .id-card-footer{display:flex;justify-content:space-between;font-size:6pt;color:#999999;border-top:0.3mm solid #cccccc;padding-top:1.5mm;}
+  }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
@@ -499,7 +531,10 @@
       <div class="hero-frame">
         <span class="corner c1"></span><span class="corner c2"></span>
         <span class="corner c3"></span><span class="corner c4"></span>
-        <img id="heroPhoto" alt="Foto bersama anggota Klub Fotografi Wima" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">
+        <img class="hero-slide" data-slide="0" alt="Foto pertemuan pertama tahun ke-1">
+        <img class="hero-slide" data-slide="1" alt="Foto pertemuan pertama tahun ke-2">
+        <img class="hero-slide" data-slide="2" alt="Foto pertemuan pertama tahun ke-3">
+        <div class="hero-dots" id="heroDots"></div>
       </div>
     </div>
 
@@ -651,6 +686,31 @@
   </div>
 </div>
 
+<!-- Kartu Anggota — tersembunyi di layar normal, cuma muncul pas dicetak (Ctrl+P) -->
+<div id="printCard" class="print-only">
+  <div class="id-card">
+    <div class="id-card-header">
+      <img src="logo.png" class="id-card-logo" alt="">
+      <div>
+        <div class="id-card-club">Klub Fotografi Wima</div>
+        <div class="id-card-school">SMK Wiyata Mandala Bogor</div>
+      </div>
+    </div>
+    <div class="id-card-body">
+      <img id="printCardPhoto" class="id-card-photo" src="" alt="">
+      <div class="id-card-info">
+        <div class="id-card-name" id="printCardName"></div>
+        <div class="id-card-role" id="printCardRole"></div>
+        <div class="id-card-level" id="printCardLevel"></div>
+      </div>
+    </div>
+    <div class="id-card-footer">
+      <span id="printCardId"></span>
+      <span>Kartu Anggota Resmi</span>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ================================================================
    KONFIGURASI — WAJIB DIISI
@@ -679,34 +739,34 @@ const ALL_GENRES = ["Street", "Human Interest", "Portrait", "Automotive", "Aviat
 
 /* ================================================================
    SISTEM LEVEL — SATU-SATUNYA tempat aturan poin & level diatur.
-   (Dulu ada juga di Code.gs — sudah dihapus dari sana supaya tidak
-   ada dua tempat yang harus disinkronkan manual dan bisa beda sendiri.)
+   Level 1-100, tiap level butuh 100 poin. Gelar berubah tiap 10 level
+   (Level 1-10 = Novice, 11-20 = Apprentice, dst, 91-100 = Legendary).
    ================================================================ */
 const RARITY_POINTS = { common: 10, rare: 25, super: 50, ultra: 100 };
-const LEVELS = [
-  { level: 1,  name: "Novice",     min: 0    },
-  { level: 2,  name: "Apprentice", min: 50   },
-  { level: 3,  name: "Hobbyist",   min: 120  },
-  { level: 4,  name: "Enthusiast", min: 220  },
-  { level: 5,  name: "Skilled",    min: 350  },
-  { level: 6,  name: "Veteran",    min: 500  },
-  { level: 7,  name: "Expert",     min: 700  },
-  { level: 8,  name: "Master",     min: 950  },
-  { level: 9,  name: "Elite",      min: 1250 },
-  { level: 10, name: "Legendary",  min: 1600 },
-];
+const POINTS_PER_LEVEL = 100;
+const MAX_LEVEL = 100;
+const LEVEL_TITLES = ["Novice","Apprentice","Hobbyist","Enthusiast","Skilled","Veteran","Expert","Master","Elite","Legendary"];
+
+function titleForLevel(level){
+  const tierIndex = Math.min(LEVEL_TITLES.length - 1, Math.floor((level - 1) / 10));
+  return LEVEL_TITLES[tierIndex];
+}
 function getLevelInfo(points){
-  let current = LEVELS[0];
-  for(const lv of LEVELS){ if(points >= lv.min) current = lv; else break; }
-  const idx = LEVELS.indexOf(current);
-  const next = LEVELS[idx+1] || null;
+  const level = Math.min(MAX_LEVEL, Math.floor(points / POINTS_PER_LEVEL) + 1);
+  const isMax = level >= MAX_LEVEL;
+  const levelName = titleForLevel(level);
+  const currentLevelMin = (level - 1) * POINTS_PER_LEVEL;
+  const nextLevel = isMax ? null : level + 1;
+  const nextLevelName = isMax ? null : titleForLevel(nextLevel);
   return {
     points,
-    level: current.level,
-    level_name: current.name,
-    next_level_name: next ? next.name : null,
-    points_to_next: next ? next.min - points : 0,
-    progress_pct: next ? Math.round(((points - current.min) / (next.min - current.min)) * 100) : 100,
+    level,
+    level_name: levelName,
+    next_level: nextLevel,
+    next_level_name: nextLevelName,
+    title_changes_next: !isMax && nextLevelName !== levelName,
+    points_to_next: isMax ? 0 : (level * POINTS_PER_LEVEL - points),
+    progress_pct: isMax ? 100 : Math.round(((points - currentLevelMin) / POINTS_PER_LEVEL) * 100),
   };
 }
 /* Menyamakan penulisan rarity di Sheet (Super Rare / super_rare / dst) jadi
@@ -771,7 +831,6 @@ function categoryIcon(category, color){
 }
 const RARITY_COLOR = { common:"#8A8A8A", rare:"#3B6FA0", super:"#7A4FB5", ultra:"#B8860B" };
 const RARITY_LABEL = { common:"Common", rare:"Rare", super:"Super Rare", ultra:"Ultra Rare" };
-const RARITY_ORDER = { common:0, rare:1, super:2, ultra:3 };
 
 function svgIcon(category, rarity, size){
   const color = RARITY_COLOR[rarity] || "#4D4D4D";
@@ -872,7 +931,9 @@ async function loadPublicData(){
         points: levelInfo.points,
         level: levelInfo.level,
         level_name: levelInfo.level_name,
+        next_level: levelInfo.next_level,
         next_level_name: levelInfo.next_level_name,
+        title_changes_next: levelInfo.title_changes_next,
         points_to_next: levelInfo.points_to_next,
         progress_pct: levelInfo.progress_pct,
       };
@@ -921,7 +982,37 @@ function renderIdentity(){
   document.getElementById("footerText").textContent = CLUB.name + " · " + CLUB.school;
 
   document.getElementById("logoMark").src = LOGO_SRC;
-  document.getElementById("heroPhoto").src = FOTO_SRC;
+  initHeroSlideshow();
+}
+
+/* ================================================================
+   SLIDESHOW HERO — 3 foto pertemuan pertama tiap tahun ekskul,
+   berganti otomatis. Ganti nama filenya kalau foto tahun ke-2 & ke-3
+   sudah siap (sekarang masih pakai foto-anggota.jpg buat ketiganya
+   sebagai plaseholder).
+   ================================================================ */
+const HERO_SLIDES = [FOTO_SRC, FOTO_SRC, FOTO_SRC];
+let heroSlideIndex = 0;
+function initHeroSlideshow(){
+  const slides = document.querySelectorAll(".hero-slide");
+  slides.forEach((img,i)=>{ img.src = HERO_SLIDES[i] || HERO_SLIDES[0]; });
+  showHeroSlide(0);
+
+  const dotsWrap = document.getElementById("heroDots");
+  dotsWrap.innerHTML = HERO_SLIDES.map((_,i)=>`<button class="dot ${i===0 ? "active" : ""}" data-i="${i}" aria-label="Foto ${i+1}"></button>`).join("");
+  dotsWrap.querySelectorAll(".dot").forEach(dot=>{
+    dot.addEventListener("click", ()=> showHeroSlide(parseInt(dot.dataset.i, 10)));
+  });
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(!prefersReducedMotion && slides.length > 1 && !window._heroInterval){
+    window._heroInterval = setInterval(()=> showHeroSlide((heroSlideIndex + 1) % slides.length), 5000);
+  }
+}
+function showHeroSlide(i){
+  document.querySelectorAll(".hero-slide").forEach((img,idx)=> img.classList.toggle("active", idx===i));
+  document.querySelectorAll("#heroDots .dot").forEach((dot,idx)=> dot.classList.toggle("active", idx===i));
+  heroSlideIndex = i;
 }
 
 /* ================================================================
@@ -1083,7 +1174,7 @@ function applyAnggotaFilter(){
     return `
     <button class="member-card" data-index="${realIndex}">
       ${m.foto_profil_url ? `<img src="${thumbSize(m.foto_profil_url,150)}" class="avatar" style="object-fit:cover;">` : `<div class="avatar">${initials(m.nama)}</div>`}
-      <div class="level-pill">${m.level_name}</div>
+      <div class="level-pill">Lv.${m.level} · ${m.level_name}</div>
       <div class="member-name">${m.nama}</div>
       <div class="member-role">${m.role}</div>
       <div class="genre-tags">${shownGenres.map(g=>`<span class="tag">${g}</span>`).join("")}${extraGenres > 0 ? `<span class="tag tag-more">+${extraGenres}</span>` : ""}</div>
@@ -1105,11 +1196,88 @@ document.getElementById("anggotaSort").addEventListener("change", (e)=>{
   applyAnggotaFilter();
 });
 
+// Parser tanggal format "d MMM yyyy" (mis. "5 Jan 2026") jadi timestamp buat sortir
+const BULAN_MAP = { jan:0, feb:1, mar:2, apr:3, mei:4, may:4, jun:5, jul:6, agu:7, aug:7, sep:8, okt:9, oct:9, nov:10, des:11, dec:11 };
+function parseTanggalIndo(str){
+  if(!str) return 0;
+  const parts = String(str).trim().split(/\s+/);
+  if(parts.length < 3) return 0;
+  const day = parseInt(parts[0],10);
+  const month = BULAN_MAP[String(parts[1]).toLowerCase().slice(0,3)];
+  const year = parseInt(parts[2],10);
+  if(isNaN(day) || month===undefined || isNaN(year)) return 0;
+  return new Date(year, month, day).getTime();
+}
+
 function openMemberProfile(member){
   modalMember = member;
+  const isOwner = currentUser && String(currentUser.id) === String(member.id);
+  const totalPhotos = member.badges.length;
 
-  // Gabung klaim yang lencananya sama (misal difoto 2x dari angle beda) jadi satu
-  // kartu dengan hitungan "(2)" — semua fotonya tetap kesimpen, cuma tampilannya dirapikan.
+  document.getElementById("profilBody").innerHTML = `
+    ${member.foto_profil_url ? `<img src="${thumbSize(member.foto_profil_url,300)}" class="avatar avatar-lg" style="object-fit:cover;" id="profileAvatarImg">` : `<div class="avatar avatar-lg">${initials(member.nama)}</div>`}
+    <div class="level-pill">Lv.${member.level} · ${member.level_name}</div>
+    <div class="modal-name">${member.nama}</div>
+    <div class="modal-role">${member.role}</div>
+    <div class="modal-section-label">Level & Poin</div>
+    <div style="font-size:13px;">${member.points} poin ${member.next_level ? `— <span style="color:var(--ink-60);">${member.points_to_next} poin lagi ke Level ${member.next_level}${member.title_changes_next ? ` <b>(naik gelar jadi ${member.next_level_name}!)</b>` : ""}</span>` : `— <span style="color:var(--ink-60);">Level tertinggi tercapai 🏆</span>`}</div>
+    <div class="level-progress-track"><div class="level-progress-fill" style="width:${member.progress_pct}%;"></div></div>
+    <div class="modal-section-label">Genre Favorit</div>
+    <div class="genre-tags">${member.genres.length ? member.genres.map(g=>`<span class="tag">${g}</span>`).join("") : `<span style="font-size:12px;color:var(--ink-60);">Belum diisi.</span>`}</div>
+
+    <details class="badge-category" open style="margin-top:18px;">
+      <summary><span class="cat-title">Galeri<span class="cat-count">(${totalPhotos})</span></span></summary>
+      <div style="padding:0 16px 16px;">
+        <div class="filter-row" style="margin-bottom:14px;">
+          <select id="galeriSortSelect">
+            <option value="terbaru">Urutkan: Upload Terakhir</option>
+            <option value="kategori">Urutkan: Kategori</option>
+          </select>
+        </div>
+        <div class="proof-gallery" id="galeriGrid"></div>
+      </div>
+    </details>
+
+    <details class="badge-category" open>
+      <summary><span class="cat-title">Lencana<span class="cat-count">(${Object.keys(groupBadgesByLencana(member)).length}/${DATA.badges.length})</span></span></summary>
+      <div style="padding:0 16px 16px;">
+        <div class="filter-row" style="margin-bottom:14px;">
+          <select id="lencanaSortSelect">
+            <option value="terbaru">Urutkan: Upload Terakhir</option>
+            <option value="kategori">Urutkan: Kategori</option>
+          </select>
+        </div>
+        <div class="modal-badges" id="modalBadgeChips"></div>
+      </div>
+    </details>
+
+    ${isOwner ? `
+      <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn small" id="editProfileBtn">Edit Profil Saya</button>
+        <button class="btn small ghost" id="printCardBtn">🖨️ Cetak Kartu Anggota</button>
+      </div>
+    ` : ""}
+  `;
+  showView("profil");
+
+  if(member.foto_profil_url){
+    document.getElementById("profileAvatarImg").addEventListener("click", ()=> openImageLightbox(thumbSize(member.foto_profil_url,1200)));
+  }
+
+  renderGaleriSection(member);
+  renderLencanaSection(member);
+  document.getElementById("galeriSortSelect").addEventListener("change", ()=> renderGaleriSection(member));
+  document.getElementById("lencanaSortSelect").addEventListener("change", ()=> renderLencanaSection(member));
+
+  if(isOwner){
+    document.getElementById("editProfileBtn").addEventListener("click", ()=> openEditProfileForm(member));
+    document.getElementById("printCardBtn").addEventListener("click", ()=> printMemberCard(member));
+  }
+}
+
+/* Gabung klaim yang lencananya sama (misal difoto 2x dari angle beda) jadi satu
+   entri dengan hitungan "(2)" — semua fotonya tetap kesimpen di dalamnya. */
+function groupBadgesByLencana(member){
   const grouped = {};
   member.badges.forEach(item=>{
     const info = DATA.badges.find(b=>b.id===item.id_lencana);
@@ -1117,42 +1285,71 @@ function openMemberProfile(member){
     if(!grouped[item.id_lencana]) grouped[item.id_lencana] = { ...info, photos: [] };
     grouped[item.id_lencana].photos.push({ foto_bukti_url:item.foto_bukti_url, tanggal:item.tanggal });
   });
-  const earned = Object.values(grouped).sort((a,b)=> (RARITY_ORDER[a.rarity]??99) - (RARITY_ORDER[b.rarity]??99));
+  return grouped;
+}
 
-  const isOwner = currentUser && String(currentUser.id) === String(member.id);
-
-  document.getElementById("profilBody").innerHTML = `
-    ${member.foto_profil_url ? `<img src="${thumbSize(member.foto_profil_url,300)}" class="avatar avatar-lg" style="object-fit:cover;" id="profileAvatarImg">` : `<div class="avatar avatar-lg">${initials(member.nama)}</div>`}
-    <div class="level-pill">${member.level_name}</div>
-    <div class="modal-name">${member.nama}</div>
-    <div class="modal-role">${member.role}</div>
-    <div class="modal-section-label">Level & Poin</div>
-    <div style="font-size:13px;">${member.points} poin ${member.next_level_name ? `— <span style="color:var(--ink-60);">${member.points_to_next} poin lagi menuju <b>${member.next_level_name}</b></span>` : `— <span style="color:var(--ink-60);">Level tertinggi tercapai 🏆</span>`}</div>
-    <div class="level-progress-track"><div class="level-progress-fill" style="width:${member.progress_pct}%;"></div></div>
-    <div class="modal-section-label">Genre Favorit</div>
-    <div class="genre-tags">${member.genres.length ? member.genres.map(g=>`<span class="tag">${g}</span>`).join("") : `<span style="font-size:12px;color:var(--ink-60);">Belum diisi.</span>`}</div>
-    <div class="modal-section-label">Lencana Terkumpul (${earned.length}/${DATA.badges.length})</div>
-    <div class="modal-badges" id="modalBadgeChips">
-      ${earned.length ? earned.map((b,i)=>`
-        <div class="b-chip ${b.rarity}" data-i="${i}" style="cursor:pointer;" title="Klik untuk lihat foto buktinya">
-          <div class="badge-icon">${svgIcon(b.kategori,b.rarity,20)}</div>
-          <span>${b.nama}${b.photos.length>1 ? ` <span class="chip-count">(${b.photos.length})</span>` : ""}</span>
-        </div>
-      `).join("") : `<span style="font-size:12px;color:var(--ink-60);">Belum ada lencana yang dikumpulkan.</span>`}
-    </div>
-    ${isOwner ? `<div class="form-actions"><button class="btn small" id="editProfileBtn">Edit Profil Saya</button></div>` : ""}
-  `;
-  showView("profil");
-
-  if(member.foto_profil_url){
-    document.getElementById("profileAvatarImg").addEventListener("click", ()=> openImageLightbox(thumbSize(member.foto_profil_url,1200)));
+function renderGaleriSection(member){
+  const sortMode = document.getElementById("galeriSortSelect").value;
+  let items = member.badges.map(item=>{
+    const info = DATA.badges.find(b=>b.id===item.id_lencana);
+    return {
+      foto_bukti_url: item.foto_bukti_url,
+      tanggal: item.tanggal,
+      nama: info ? info.nama : "(Lencana tidak diketahui)",
+      kategori: info ? info.kategori : "Lainnya",
+    };
+  });
+  if(sortMode === "kategori"){
+    items.sort((a,b)=> a.kategori.localeCompare(b.kategori) || parseTanggalIndo(b.tanggal)-parseTanggalIndo(a.tanggal));
+  } else {
+    items.sort((a,b)=> parseTanggalIndo(b.tanggal) - parseTanggalIndo(a.tanggal));
   }
-  document.querySelectorAll("#modalBadgeChips .b-chip").forEach(chip=>{
+  const grid = document.getElementById("galeriGrid");
+  grid.innerHTML = items.length ? items.map(it=>`
+    <div class="proof-item">
+      <img src="${thumbSize(it.foto_bukti_url,400)}" data-full="${thumbSize(it.foto_bukti_url,1600)}">
+      <div class="proof-date">${it.nama}${sortMode==="kategori" ? ` · ${it.kategori}` : ""}${it.tanggal ? ` · ${it.tanggal}` : ""}</div>
+    </div>
+  `).join("") : `<span style="font-size:12px;color:var(--ink-60);">Belum ada foto yang diupload.</span>`;
+  grid.querySelectorAll("img").forEach(img=>{
+    img.addEventListener("click", ()=> openImageLightbox(img.dataset.full));
+  });
+}
+
+function renderLencanaSection(member){
+  const sortMode = document.getElementById("lencanaSortSelect").value;
+  const grouped = groupBadgesByLencana(member);
+  let earned = Object.values(grouped).map(b=>{
+    b._latest = Math.max(...b.photos.map(p=>parseTanggalIndo(p.tanggal)));
+    return b;
+  });
+  if(sortMode === "kategori"){
+    earned.sort((a,b)=> a.kategori.localeCompare(b.kategori) || b._latest - a._latest);
+  } else {
+    earned.sort((a,b)=> b._latest - a._latest);
+  }
+  const chips = document.getElementById("modalBadgeChips");
+  chips.innerHTML = earned.length ? earned.map((b,i)=>`
+    <div class="b-chip ${b.rarity}" data-i="${i}" style="cursor:pointer;" title="Klik untuk lihat foto buktinya">
+      <div class="badge-icon">${svgIcon(b.kategori,b.rarity,20)}</div>
+      <span>${b.nama}${b.photos.length>1 ? ` <span class="chip-count">(${b.photos.length})</span>` : ""}</span>
+    </div>
+  `).join("") : `<span style="font-size:12px;color:var(--ink-60);">Belum ada lencana yang dikumpulkan.</span>`;
+  chips.querySelectorAll(".b-chip").forEach(chip=>{
     chip.addEventListener("click", ()=> openBadgeProof(earned[chip.dataset.i]));
   });
-  if(isOwner){
-    document.getElementById("editProfileBtn").addEventListener("click", ()=> openEditProfileForm(member));
-  }
+}
+
+/* ================================================================
+   CETAK KARTU ANGGOTA
+   ================================================================ */
+function printMemberCard(member){
+  document.getElementById("printCardPhoto").src = member.foto_profil_url ? thumbSize(member.foto_profil_url,400) : LOGO_SRC;
+  document.getElementById("printCardName").textContent = member.nama;
+  document.getElementById("printCardRole").textContent = member.role;
+  document.getElementById("printCardLevel").textContent = `Level ${member.level} — ${member.level_name}`;
+  document.getElementById("printCardId").textContent = "ID Anggota: " + member.id;
+  window.print();
 }
 
 function openBadgeProof(badge){
