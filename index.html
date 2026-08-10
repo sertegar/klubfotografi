@@ -462,33 +462,6 @@
     .badge-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
     .modal-badges{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
   }
-
-  /* ============================================================
-     KARTU ANGGOTA — cuma tampil pas dicetak (Ctrl+P)
-     ============================================================ */
-  .print-only{display:none;}
-  @media print{
-    body *{visibility:hidden;}
-    #printCard, #printCard *{visibility:visible;}
-    #printCard{display:block;position:fixed;top:0;left:0;width:100%;}
-    .id-card{
-      width:85.6mm;height:54mm;margin:25mm auto;
-      border:1px solid #333333;border-radius:3mm;
-      padding:4mm;box-sizing:border-box;
-      font-family:Tahoma,sans-serif;color:#333333;background:#FFFFFF;
-      display:flex;flex-direction:column;justify-content:space-between;
-    }
-    .id-card-header{display:flex;align-items:center;gap:2mm;border-bottom:0.3mm solid #cccccc;padding-bottom:2mm;}
-    .id-card-logo{width:8mm;height:8mm;border-radius:50%;}
-    .id-card-club{font-size:9pt;font-weight:bold;line-height:1.2;}
-    .id-card-school{font-size:6pt;color:#666666;line-height:1.2;}
-    .id-card-body{display:flex;gap:4mm;align-items:center;flex:1;}
-    .id-card-photo{width:20mm;height:20mm;border-radius:50%;object-fit:cover;border:0.4mm solid #333333;}
-    .id-card-name{font-size:12pt;font-weight:bold;line-height:1.25;}
-    .id-card-role{font-size:8pt;color:#666666;margin-top:1mm;}
-    .id-card-level{font-size:7.5pt;margin-top:2mm;border:0.3mm solid #333333;display:inline-block;padding:0.8mm 2mm;border-radius:2mm;}
-    .id-card-footer{display:flex;justify-content:space-between;font-size:6pt;color:#999999;border-top:0.3mm solid #cccccc;padding-top:1.5mm;}
-  }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
@@ -683,31 +656,6 @@
   <div class="lightbox-inner">
     <button class="modal-close" id="lightboxClose" aria-label="Tutup">✕</button>
     <img id="lightboxImg" src="" alt="">
-  </div>
-</div>
-
-<!-- Kartu Anggota — tersembunyi di layar normal, cuma muncul pas dicetak (Ctrl+P) -->
-<div id="printCard" class="print-only">
-  <div class="id-card">
-    <div class="id-card-header">
-      <img src="logo.png" class="id-card-logo" alt="">
-      <div>
-        <div class="id-card-club">Klub Fotografi Wima</div>
-        <div class="id-card-school">SMK Wiyata Mandala Bogor</div>
-      </div>
-    </div>
-    <div class="id-card-body">
-      <img id="printCardPhoto" class="id-card-photo" src="" alt="">
-      <div class="id-card-info">
-        <div class="id-card-name" id="printCardName"></div>
-        <div class="id-card-role" id="printCardRole"></div>
-        <div class="id-card-level" id="printCardLevel"></div>
-      </div>
-    </div>
-    <div class="id-card-footer">
-      <span id="printCardId"></span>
-      <span>Kartu Anggota Resmi</span>
-    </div>
   </div>
 </div>
 
@@ -1254,7 +1202,7 @@ function openMemberProfile(member){
     ${isOwner ? `
       <div class="form-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn small" id="editProfileBtn">Edit Profil Saya</button>
-        <button class="btn small ghost" id="printCardBtn">🖨️ Cetak Kartu Anggota</button>
+        <button class="btn small ghost" id="downloadCardBtn">💾 Download Kartu Anggota</button>
       </div>
     ` : ""}
   `;
@@ -1271,7 +1219,7 @@ function openMemberProfile(member){
 
   if(isOwner){
     document.getElementById("editProfileBtn").addEventListener("click", ()=> openEditProfileForm(member));
-    document.getElementById("printCardBtn").addEventListener("click", ()=> printMemberCard(member));
+    document.getElementById("downloadCardBtn").addEventListener("click", ()=> generateMemberCard(member));
   }
 }
 
@@ -1343,13 +1291,288 @@ function renderLencanaSection(member){
 /* ================================================================
    CETAK KARTU ANGGOTA
    ================================================================ */
-function printMemberCard(member){
-  document.getElementById("printCardPhoto").src = member.foto_profil_url ? thumbSize(member.foto_profil_url,400) : LOGO_SRC;
-  document.getElementById("printCardName").textContent = member.nama;
-  document.getElementById("printCardRole").textContent = member.role;
-  document.getElementById("printCardLevel").textContent = `Level ${member.level} — ${member.level_name}`;
-  document.getElementById("printCardId").textContent = "ID Anggota: " + member.id;
-  window.print();
+/* ================================================================
+   KARTU ANGGOTA DIGITAL — digambar di <canvas>, hasilnya didownload
+   sebagai file PNG. Skema warna & elemen visual mengikuti tema
+   website (background abu gelap, aksen warna sesuai tier level).
+   ================================================================ */
+function loadImageAsync(src, allowCORS){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    if(allowCORS) img.crossOrigin = "anonymous";
+    img.onload = ()=> resolve(img);
+    img.onerror = ()=> reject(new Error("Gagal memuat gambar: " + src));
+    img.src = src;
+  });
+}
+
+function roundRectPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function drawImageCover(ctx, img, x, y, w, h){
+  const imgRatio = img.width / img.height;
+  const boxRatio = w / h;
+  let sx, sy, sw, sh;
+  if(imgRatio > boxRatio){
+    sh = img.height; sw = sh * boxRatio; sx = (img.width - sw)/2; sy = 0;
+  } else {
+    sw = img.width; sh = sw / boxRatio; sx = 0; sy = (img.height - sh)/2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+function levelTierColor(level){
+  if(level >= 9) return RARITY_COLOR.ultra;
+  if(level >= 7) return RARITY_COLOR.super;
+  if(level >= 4) return RARITY_COLOR.rare;
+  return RARITY_COLOR.common;
+}
+
+function slugifyFilename(s){
+  return String(s || "anggota").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function drawStatBlock(ctx, x, y, label, value){
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255,255,255,.64)";
+  ctx.font = "bold 17px Arial, sans-serif";
+  ctx.fillText(label, x, y);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 42px Arial, sans-serif";
+  ctx.fillText(value, x, y + 48);
+}
+
+function drawMemberCardOnCanvas(ctx, member, logoImg, photoImg){
+  const W = 1600, H = 1000;
+  const pad = 60;
+  const accent = levelTierColor(member.level);
+  const badgeCount = Object.keys(groupBadgesByLencana(member)).length;
+
+  ctx.clearRect(0,0,W,H);
+
+  // background
+  ctx.fillStyle = "#333333";
+  roundRectPath(ctx,0,0,W,H,28);
+  ctx.fill();
+
+  // outer frame
+  ctx.strokeStyle = "rgba(255,255,255,.38)";
+  ctx.lineWidth = 3;
+  roundRectPath(ctx,6,6,W-12,H-12,24);
+  ctx.stroke();
+
+  // header: logo + club name
+  if(logoImg){
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(pad+42, pad+42, 42, 0, Math.PI*2);
+    ctx.closePath();
+    ctx.clip();
+    drawImageCover(ctx, logoImg, pad, pad, 84, 84);
+    ctx.restore();
+  }
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 32px Arial, sans-serif";
+  ctx.fillText(CLUB.name, pad+104, pad+36);
+  ctx.fillStyle = "rgba(255,255,255,.64)";
+  ctx.font = "19px Arial, sans-serif";
+  ctx.fillText(CLUB.school, pad+104, pad+64);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(255,255,255,.64)";
+  ctx.font = "bold 16px Arial, sans-serif";
+  ctx.fillText("KARTU ANGGOTA DIGITAL", W-pad, pad+30);
+  ctx.textAlign = "left";
+
+  // header divider
+  const headerBottom = pad+118;
+  ctx.strokeStyle = "rgba(255,255,255,.16)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pad, headerBottom);
+  ctx.lineTo(W-pad, headerBottom);
+  ctx.stroke();
+
+  // photo (left column, circular)
+  const photoR = 150;
+  const photoCX = pad + photoR + 10;
+  const photoCY = headerBottom + 70 + photoR;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(photoCX, photoCY, photoR, 0, Math.PI*2);
+  ctx.closePath();
+  ctx.clip();
+  if(photoImg){
+    drawImageCover(ctx, photoImg, photoCX-photoR, photoCY-photoR, photoR*2, photoR*2);
+  } else {
+    ctx.fillStyle = "#3D3D3D";
+    ctx.fillRect(photoCX-photoR, photoCY-photoR, photoR*2, photoR*2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 100px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(initials(member.nama), photoCX, photoCY+8);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+  ctx.restore();
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = accent;
+  ctx.beginPath();
+  ctx.arc(photoCX, photoCY, photoR, 0, Math.PI*2);
+  ctx.stroke();
+
+  // level pill below photo
+  const pillY = photoCY + photoR + 34;
+  ctx.font = "bold 24px Arial, sans-serif";
+  const pillText = member.level_name.toUpperCase();
+  const pillW = ctx.measureText(pillText).width + 56;
+  const pillH = 50;
+  const pillX = photoCX - pillW/2;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2.5;
+  roundRectPath(ctx, pillX, pillY, pillW, pillH, pillH/2);
+  ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(pillText, photoCX, pillY+pillH/2+2);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  // right column
+  const rightX = pad + photoR*2 + 90;
+  const rightW = W - pad - rightX;
+  let cy = headerBottom + 90;
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 50px Arial, sans-serif";
+  ctx.fillText(member.nama, rightX, cy);
+  cy += 44;
+
+  ctx.fillStyle = "rgba(255,255,255,.64)";
+  ctx.font = "25px Arial, sans-serif";
+  ctx.fillText(member.role || "", rightX, cy);
+  cy += 54;
+
+  // genre tags (maks 2 baris, sisanya diringkas "+N")
+  ctx.font = "bold 17px Arial, sans-serif";
+  let tx = rightX, ty = cy, rows = 1;
+  const genres = member.genres || [];
+  let shown = 0;
+  for(let i=0;i<genres.length;i++){
+    const label = genres[i].toUpperCase();
+    const tagW = ctx.measureText(label).width + 26;
+    if(tx + tagW > rightX + rightW && tx !== rightX){
+      tx = rightX; ty += 46; rows++;
+      if(rows > 2) break;
+    }
+    ctx.strokeStyle = "rgba(255,255,255,.38)";
+    ctx.lineWidth = 1.5;
+    roundRectPath(ctx, tx, ty-30, tagW, 38, 6);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.64)";
+    ctx.fillText(label, tx+13, ty-6);
+    tx += tagW + 10;
+    shown++;
+  }
+  if(shown < genres.length){
+    const extra = "+" + (genres.length - shown);
+    ctx.fillStyle = "rgba(255,255,255,.38)";
+    ctx.fillText(extra, tx+6, ty-6);
+  }
+  if(!genres.length){
+    ctx.fillStyle = "rgba(255,255,255,.38)";
+    ctx.font = "17px Arial, sans-serif";
+    ctx.fillText("Belum ada genre favorit", rightX, ty-6);
+  }
+  cy = ty + 46;
+
+  // divider
+  ctx.strokeStyle = "rgba(255,255,255,.16)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(rightX, cy);
+  ctx.lineTo(W-pad, cy);
+  ctx.stroke();
+  cy += 50;
+
+  drawStatBlock(ctx, rightX, cy, "LENCANA TERKUMPUL", `${badgeCount} / ${DATA.badges.length}`);
+  drawStatBlock(ctx, rightX + rightW/2, cy, "TOTAL POIN", String(member.points));
+
+  // footer
+  ctx.strokeStyle = "rgba(255,255,255,.16)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pad, H-pad-24);
+  ctx.lineTo(W-pad, H-pad-24);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255,255,255,.64)";
+  ctx.font = "17px Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("ID Anggota: " + member.id, pad, H-pad+2);
+  ctx.textAlign = "right";
+  ctx.fillText("Kartu Anggota Digital", W-pad, H-pad+2);
+  ctx.textAlign = "left";
+}
+
+async function generateMemberCard(member){
+  const btn = document.getElementById("downloadCardBtn");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Membuat kartu...";
+
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 1000;
+    const ctx = canvas.getContext("2d");
+
+    const logoImg = await loadImageAsync(LOGO_SRC, false).catch(()=>null);
+
+    let photoImg = null;
+    if(member.foto_profil_url){
+      photoImg = await loadImageAsync(thumbSize(member.foto_profil_url,500), true).catch(()=>null);
+    }
+
+    drawMemberCardOnCanvas(ctx, member, logoImg, photoImg);
+
+    let dataUrl, photoTainted = false;
+    try {
+      dataUrl = canvas.toDataURL("image/png");
+    } catch(e){
+      // Canvas "tainted" — foto Drive gak ngizinin dibaca lintas domain.
+      // Gambar ulang tanpa foto (pakai avatar inisial) supaya tetap bisa didownload.
+      photoTainted = true;
+      drawMemberCardOnCanvas(ctx, member, logoImg, null);
+      dataUrl = canvas.toDataURL("image/png");
+    }
+
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `kartu-anggota-${slugifyFilename(member.nama)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    if(photoTainted){
+      alert("Kartu berhasil dibuat, tapi foto profil gak bisa ditempel otomatis (batasan izin gambar dari Google Drive). Kartu didownload pakai avatar inisial sebagai gantinya.");
+    }
+  } catch(err){
+    alert("Gagal membuat kartu anggota: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 }
 
 function openBadgeProof(badge){
