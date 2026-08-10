@@ -831,6 +831,19 @@ async function apiPost(payload){
   return fetchWithRetry(API_URL, { method: "POST", body: JSON.stringify(payload) });
 }
 
+/* Dipakai buat download kartu anggota: minta foto profil dalam bentuk
+   data URL base64 lewat Apps Script (bukan langsung dari Drive), supaya
+   gambar bisa aman digambar di <canvas> tanpa kena batasan CORS Drive. */
+async function apiGetImageBase64(fileId){
+  const url = `${API_URL}?action=getImageBase64&fileId=${encodeURIComponent(fileId)}`;
+  return fetchWithRetry(url, { method: "GET" });
+}
+
+function extractDriveFileId(url){
+  const m = String(url || "").match(/[?&]id=([^&]+)/);
+  return m ? m[1] : null;
+}
+
 /* ================================================================
    AMBIL DATA PUBLIK LANGSUNG DARI CSV (bukan lewat Apps Script)
    Ini yang bikin loading halaman publik cepat — CSV disajikan
@@ -1342,16 +1355,16 @@ function slugifyFilename(s){
 function drawStatBlock(ctx, x, y, label, value){
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(255,255,255,.64)";
-  ctx.font = "bold 17px Arial, sans-serif";
+  ctx.font = "bold 20px Arial, sans-serif";
   ctx.fillText(label, x, y);
   ctx.fillStyle = "#FFFFFF";
-  ctx.font = "bold 42px Arial, sans-serif";
-  ctx.fillText(value, x, y + 48);
+  ctx.font = "bold 52px Arial, sans-serif";
+  ctx.fillText(value, x, y + 56);
 }
 
 function drawMemberCardOnCanvas(ctx, member, logoImg, photoImg){
-  const W = 1600, H = 1000;
-  const pad = 60;
+  const W = 1600, H = 820;
+  const pad = 64;
   const accent = levelTierColor(member.level);
   const badgeCount = Object.keys(groupBadgesByLencana(member)).length;
 
@@ -1372,28 +1385,28 @@ function drawMemberCardOnCanvas(ctx, member, logoImg, photoImg){
   if(logoImg){
     ctx.save();
     ctx.beginPath();
-    ctx.arc(pad+42, pad+42, 42, 0, Math.PI*2);
+    ctx.arc(pad+44, pad+44, 44, 0, Math.PI*2);
     ctx.closePath();
     ctx.clip();
-    drawImageCover(ctx, logoImg, pad, pad, 84, 84);
+    drawImageCover(ctx, logoImg, pad, pad, 88, 88);
     ctx.restore();
   }
   ctx.textAlign = "left";
   ctx.fillStyle = "#FFFFFF";
-  ctx.font = "bold 32px Arial, sans-serif";
-  ctx.fillText(CLUB.name, pad+104, pad+36);
+  ctx.font = "bold 36px Arial, sans-serif";
+  ctx.fillText(CLUB.name, pad+112, pad+38);
   ctx.fillStyle = "rgba(255,255,255,.64)";
-  ctx.font = "19px Arial, sans-serif";
-  ctx.fillText(CLUB.school, pad+104, pad+64);
+  ctx.font = "22px Arial, sans-serif";
+  ctx.fillText(CLUB.school, pad+112, pad+70);
 
   ctx.textAlign = "right";
   ctx.fillStyle = "rgba(255,255,255,.64)";
-  ctx.font = "bold 16px Arial, sans-serif";
-  ctx.fillText("KARTU ANGGOTA DIGITAL", W-pad, pad+30);
+  ctx.font = "bold 19px Arial, sans-serif";
+  ctx.fillText("KARTU ANGGOTA DIGITAL", W-pad, pad+34);
   ctx.textAlign = "left";
 
   // header divider
-  const headerBottom = pad+118;
+  const headerBottom = pad+126;
   ctx.strokeStyle = "rgba(255,255,255,.16)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -1402,9 +1415,9 @@ function drawMemberCardOnCanvas(ctx, member, logoImg, photoImg){
   ctx.stroke();
 
   // photo (left column, circular)
-  const photoR = 150;
+  const photoR = 180;
   const photoCX = pad + photoR + 10;
-  const photoCY = headerBottom + 70 + photoR;
+  const photoCY = headerBottom + 66 + photoR;
   ctx.save();
   ctx.beginPath();
   ctx.arc(photoCX, photoCY, photoR, 0, Math.PI*2);
@@ -1416,29 +1429,29 @@ function drawMemberCardOnCanvas(ctx, member, logoImg, photoImg){
     ctx.fillStyle = "#3D3D3D";
     ctx.fillRect(photoCX-photoR, photoCY-photoR, photoR*2, photoR*2);
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 100px Arial, sans-serif";
+    ctx.font = "bold 120px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(initials(member.nama), photoCX, photoCY+8);
+    ctx.fillText(initials(member.nama), photoCX, photoCY+10);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
   }
   ctx.restore();
-  ctx.lineWidth = 6;
+  ctx.lineWidth = 7;
   ctx.strokeStyle = accent;
   ctx.beginPath();
   ctx.arc(photoCX, photoCY, photoR, 0, Math.PI*2);
   ctx.stroke();
 
   // level pill below photo
-  const pillY = photoCY + photoR + 34;
-  ctx.font = "bold 24px Arial, sans-serif";
+  const pillY = photoCY + photoR + 38;
+  ctx.font = "bold 28px Arial, sans-serif";
   const pillText = member.level_name.toUpperCase();
-  const pillW = ctx.measureText(pillText).width + 56;
-  const pillH = 50;
+  const pillW = ctx.measureText(pillText).width + 64;
+  const pillH = 56;
   const pillX = photoCX - pillW/2;
   ctx.strokeStyle = accent;
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 3;
   roundRectPath(ctx, pillX, pillY, pillW, pillH, pillH/2);
   ctx.stroke();
   ctx.fillStyle = accent;
@@ -1449,52 +1462,52 @@ function drawMemberCardOnCanvas(ctx, member, logoImg, photoImg){
   ctx.textBaseline = "alphabetic";
 
   // right column
-  const rightX = pad + photoR*2 + 90;
+  const rightX = pad + photoR*2 + 100;
   const rightW = W - pad - rightX;
-  let cy = headerBottom + 90;
+  let cy = headerBottom + 100;
 
   ctx.fillStyle = "#FFFFFF";
-  ctx.font = "bold 50px Arial, sans-serif";
+  ctx.font = "bold 64px Arial, sans-serif";
   ctx.fillText(member.nama, rightX, cy);
-  cy += 44;
+  cy += 52;
 
   ctx.fillStyle = "rgba(255,255,255,.64)";
-  ctx.font = "25px Arial, sans-serif";
+  ctx.font = "30px Arial, sans-serif";
   ctx.fillText(member.role || "", rightX, cy);
-  cy += 54;
+  cy += 66;
 
   // genre tags (maks 2 baris, sisanya diringkas "+N")
-  ctx.font = "bold 17px Arial, sans-serif";
+  ctx.font = "bold 20px Arial, sans-serif";
   let tx = rightX, ty = cy, rows = 1;
   const genres = member.genres || [];
   let shown = 0;
   for(let i=0;i<genres.length;i++){
     const label = genres[i].toUpperCase();
-    const tagW = ctx.measureText(label).width + 26;
+    const tagW = ctx.measureText(label).width + 32;
     if(tx + tagW > rightX + rightW && tx !== rightX){
-      tx = rightX; ty += 46; rows++;
+      tx = rightX; ty += 56; rows++;
       if(rows > 2) break;
     }
     ctx.strokeStyle = "rgba(255,255,255,.38)";
     ctx.lineWidth = 1.5;
-    roundRectPath(ctx, tx, ty-30, tagW, 38, 6);
+    roundRectPath(ctx, tx, ty-34, tagW, 44, 7);
     ctx.stroke();
     ctx.fillStyle = "rgba(255,255,255,.64)";
-    ctx.fillText(label, tx+13, ty-6);
-    tx += tagW + 10;
+    ctx.fillText(label, tx+16, ty-7);
+    tx += tagW + 12;
     shown++;
   }
   if(shown < genres.length){
     const extra = "+" + (genres.length - shown);
     ctx.fillStyle = "rgba(255,255,255,.38)";
-    ctx.fillText(extra, tx+6, ty-6);
+    ctx.fillText(extra, tx+8, ty-7);
   }
   if(!genres.length){
     ctx.fillStyle = "rgba(255,255,255,.38)";
-    ctx.font = "17px Arial, sans-serif";
-    ctx.fillText("Belum ada genre favorit", rightX, ty-6);
+    ctx.font = "20px Arial, sans-serif";
+    ctx.fillText("Belum ada genre favorit", rightX, ty-7);
   }
-  cy = ty + 46;
+  cy = ty + 60;
 
   // divider
   ctx.strokeStyle = "rgba(255,255,255,.16)";
@@ -1503,7 +1516,7 @@ function drawMemberCardOnCanvas(ctx, member, logoImg, photoImg){
   ctx.moveTo(rightX, cy);
   ctx.lineTo(W-pad, cy);
   ctx.stroke();
-  cy += 50;
+  cy += 64;
 
   drawStatBlock(ctx, rightX, cy, "LENCANA TERKUMPUL", `${badgeCount} / ${DATA.badges.length}`);
   drawStatBlock(ctx, rightX + rightW/2, cy, "TOTAL POIN", String(member.points));
@@ -1517,11 +1530,9 @@ function drawMemberCardOnCanvas(ctx, member, logoImg, photoImg){
   ctx.stroke();
 
   ctx.fillStyle = "rgba(255,255,255,.64)";
-  ctx.font = "17px Arial, sans-serif";
+  ctx.font = "20px Arial, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("ID Anggota: " + member.id, pad, H-pad+2);
-  ctx.textAlign = "right";
-  ctx.fillText("Kartu Anggota Digital", W-pad, H-pad+2);
+  ctx.fillText("ID Anggota: " + member.id, pad, H-pad+4);
   ctx.textAlign = "left";
 }
 
@@ -1534,14 +1545,27 @@ async function generateMemberCard(member){
   try {
     const canvas = document.createElement("canvas");
     canvas.width = 1600;
-    canvas.height = 1000;
+    canvas.height = 820;
     const ctx = canvas.getContext("2d");
 
     const logoImg = await loadImageAsync(LOGO_SRC, false).catch(()=>null);
 
     let photoImg = null;
     if(member.foto_profil_url){
-      photoImg = await loadImageAsync(thumbSize(member.foto_profil_url,500), true).catch(()=>null);
+      const fileId = extractDriveFileId(member.foto_profil_url);
+      if(fileId){
+        try{
+          const res = await apiGetImageBase64(fileId);
+          if(res && res.ok && res.dataUrl){
+            photoImg = await loadImageAsync(res.dataUrl, false).catch(()=>null);
+          }
+        }catch(e){ /* lanjut ke fallback di bawah */ }
+      }
+      if(!photoImg){
+        // fallback terakhir: coba muat langsung dari Drive (bisa kena CORS,
+        // makanya toDataURL di bawah tetap dibungkus try/catch)
+        photoImg = await loadImageAsync(thumbSize(member.foto_profil_url,500), true).catch(()=>null);
+      }
     }
 
     drawMemberCardOnCanvas(ctx, member, logoImg, photoImg);
