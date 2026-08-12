@@ -624,6 +624,11 @@
     <h1 class="page-title">Panel Admin</h1>
     <p class="page-sub">Klaim lencana yang menunggu persetujuan.</p>
     <div class="claim-list" id="adminClaimList"></div>
+
+    <p class="eyebrow" style="margin-top:40px;">Kelola Klaim</p>
+    <h1 class="page-title" style="font-size:22px;">Klaim yang Sudah Disetujui</h1>
+    <p class="page-sub">Hapus di sini kalau ada klaim yang salah/duplikat (misal 1 foto sempat kepakai buat lebih dari 1 lencana). Aksi hapus bersifat permanen.</p>
+    <div class="claim-list" id="adminApprovedList"></div>
   </section>
 
 </main>
@@ -1654,6 +1659,18 @@ function openEditProfileForm(member){
     </div>
     <div class="form-actions"><button class="btn" id="saveProfileBtn">Simpan Perubahan</button></div>
     <div class="form-msg" id="profileMsg"></div>
+
+    <div class="modal-section-label" style="margin-top:28px;">Ganti PIN</div>
+    <div class="field">
+      <label>PIN Baru</label>
+      <input type="password" id="newPinInput" inputmode="numeric" autocomplete="new-password" placeholder="Minimal 4 digit angka">
+    </div>
+    <div class="field">
+      <label>Ulangi PIN Baru</label>
+      <input type="password" id="newPinConfirm" inputmode="numeric" autocomplete="new-password">
+    </div>
+    <div class="form-actions"><button class="btn ghost" id="changePinBtn">Ganti PIN</button></div>
+    <div class="form-msg" id="pinMsg"></div>
   `;
 
   const selected = new Set(member.genres);
@@ -1700,6 +1717,33 @@ function openEditProfileForm(member){
         setTimeout(()=> openMemberProfile(refreshed), 500);
       }else{
         msg.className = "form-msg show err"; msg.textContent = result.error || "Gagal menyimpan.";
+      }
+    }catch(err){
+      msg.className = "form-msg show err"; msg.textContent = String(err);
+    }
+  });
+
+  document.getElementById("changePinBtn").addEventListener("click", async ()=>{
+    const msg = document.getElementById("pinMsg");
+    const p1 = document.getElementById("newPinInput").value.trim();
+    const p2 = document.getElementById("newPinConfirm").value.trim();
+    if(p1.length < 4 || !/^\d+$/.test(p1)){
+      msg.className = "form-msg show err"; msg.textContent = "PIN baru minimal 4 digit angka."; return;
+    }
+    if(p1 !== p2){
+      msg.className = "form-msg show err"; msg.textContent = "Konfirmasi PIN tidak cocok."; return;
+    }
+    msg.className = "form-msg show"; msg.textContent = "Menyimpan...";
+    try{
+      const result = await apiPost({ action:"changePin", username: currentUser.username, pin: currentUser.pin, new_pin: p1 });
+      if(result.ok){
+        currentUser.pin = p1;
+        localStorage.setItem("kfw_session", JSON.stringify(currentUser));
+        msg.className = "form-msg show ok"; msg.textContent = "PIN berhasil diganti. Dipakai otomatis mulai sekarang.";
+        document.getElementById("newPinInput").value = "";
+        document.getElementById("newPinConfirm").value = "";
+      }else{
+        msg.className = "form-msg show err"; msg.textContent = result.error || "Gagal mengganti PIN.";
       }
     }catch(err){
       msg.className = "form-msg show err"; msg.textContent = String(err);
@@ -1884,10 +1928,13 @@ document.getElementById("claimSubmitBtn").addEventListener("click", async ()=>{
    ================================================================ */
 async function loadAdminPanel(){
   const list = document.getElementById("adminClaimList");
+  const approvedList = document.getElementById("adminApprovedList");
   if(!currentUser || currentUser.hak_akses !== "admin"){
     list.innerHTML = `<div class="empty-note">Halaman ini khusus admin/pembina.</div>`;
+    approvedList.innerHTML = "";
     return;
   }
+
   list.innerHTML = `<div class="empty-note">Memuat klaim yang menunggu...</div>`;
   try{
     const result = await apiPost({ action:"getPendingClaims", username: currentUser.username, pin: currentUser.pin });
@@ -1918,6 +1965,39 @@ async function loadAdminPanel(){
     });
   }catch(err){
     list.innerHTML = `<div class="empty-note">${String(err)}</div>`;
+  }
+
+  approvedList.innerHTML = `<div class="empty-note">Memuat klaim yang sudah disetujui...</div>`;
+  try{
+    const result = await apiPost({ action:"getApprovedClaims", username: currentUser.username, pin: currentUser.pin });
+    if(!result.ok){ approvedList.innerHTML = `<div class="empty-note">${result.error}</div>`; return; }
+    if(!result.claims.length){ approvedList.innerHTML = `<div class="empty-note">Belum ada klaim yang disetujui.</div>`; return; }
+    approvedList.innerHTML = result.claims.map(c=>`
+      <div class="claim-card">
+        <img class="claim-thumb" src="${thumbSize(c.foto_bukti_url,200)}" alt="Foto bukti">
+        <div class="claim-info">
+          <div class="name">${c.nama_anggota} → ${c.nama_lencana}</div>
+          <div class="meta">${RARITY_LABEL[c.rarity] || c.rarity} · disetujui ${c.tanggal}</div>
+        </div>
+        <div class="claim-actions">
+          <button class="btn small ghost" data-id="${c.id}" data-nama="${c.nama_anggota}" data-lencana="${c.nama_lencana}" data-act="deleteClaim">Hapus</button>
+        </div>
+      </div>
+    `).join("");
+    approvedList.querySelectorAll("button[data-act]").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const yakin = confirm(`Hapus klaim "${btn.dataset.lencana}" milik ${btn.dataset.nama}?\n\nAksi ini permanen dan tidak bisa dibatalkan.`);
+        if(!yakin) return;
+        btn.disabled = true;
+        const parentCard = btn.closest(".claim-card");
+        parentCard.style.opacity = ".5";
+        await apiPost({ action:"deleteClaim", username: currentUser.username, pin: currentUser.pin, id_klaim: btn.dataset.id });
+        await loadPublicData();
+        loadAdminPanel();
+      });
+    });
+  }catch(err){
+    approvedList.innerHTML = `<div class="empty-note">${String(err)}</div>`;
   }
 }
 
