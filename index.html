@@ -1654,6 +1654,18 @@ function openEditProfileForm(member){
     </div>
     <div class="form-actions"><button class="btn" id="saveProfileBtn">Simpan Perubahan</button></div>
     <div class="form-msg" id="profileMsg"></div>
+
+    <div class="modal-section-label" style="margin-top:28px;">Ganti PIN</div>
+    <div class="field">
+      <label>PIN Baru</label>
+      <input type="password" id="newPinInput" inputmode="numeric" autocomplete="new-password" placeholder="Minimal 4 digit angka">
+    </div>
+    <div class="field">
+      <label>Ulangi PIN Baru</label>
+      <input type="password" id="newPinConfirm" inputmode="numeric" autocomplete="new-password">
+    </div>
+    <div class="form-actions"><button class="btn ghost" id="changePinBtn">Ganti PIN</button></div>
+    <div class="form-msg" id="pinMsg"></div>
   `;
 
   const selected = new Set(member.genres);
@@ -1700,6 +1712,33 @@ function openEditProfileForm(member){
         setTimeout(()=> openMemberProfile(refreshed), 500);
       }else{
         msg.className = "form-msg show err"; msg.textContent = result.error || "Gagal menyimpan.";
+      }
+    }catch(err){
+      msg.className = "form-msg show err"; msg.textContent = String(err);
+    }
+  });
+
+  document.getElementById("changePinBtn").addEventListener("click", async ()=>{
+    const msg = document.getElementById("pinMsg");
+    const p1 = document.getElementById("newPinInput").value.trim();
+    const p2 = document.getElementById("newPinConfirm").value.trim();
+    if(p1.length < 4 || !/^\d+$/.test(p1)){
+      msg.className = "form-msg show err"; msg.textContent = "PIN baru minimal 4 digit angka."; return;
+    }
+    if(p1 !== p2){
+      msg.className = "form-msg show err"; msg.textContent = "Konfirmasi PIN tidak cocok."; return;
+    }
+    msg.className = "form-msg show"; msg.textContent = "Menyimpan...";
+    try{
+      const result = await apiPost({ action:"changePin", username: currentUser.username, pin: currentUser.pin, new_pin: p1 });
+      if(result.ok){
+        currentUser.pin = p1;
+        localStorage.setItem("kfw_session", JSON.stringify(currentUser));
+        msg.className = "form-msg show ok"; msg.textContent = "PIN berhasil diganti. Dipakai otomatis mulai sekarang.";
+        document.getElementById("newPinInput").value = "";
+        document.getElementById("newPinConfirm").value = "";
+      }else{
+        msg.className = "form-msg show err"; msg.textContent = result.error || "Gagal mengganti PIN.";
       }
     }catch(err){
       msg.className = "form-msg show err"; msg.textContent = String(err);
