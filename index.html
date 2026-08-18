@@ -186,6 +186,15 @@
   .stat .value{font-size:26px;font-weight:bold;font-variant-numeric:tabular-nums;}
 
   .home-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px;}
+
+  .achv-list{display:flex;flex-direction:column;gap:1px;background:var(--ink-15);border:1px solid var(--ink-15);}
+  .achv-item{
+    display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--paper);
+  }
+  .achv-thumb{width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid var(--ink-35);flex:0 0 auto;cursor:zoom-in;}
+  .achv-text{font-size:12.5px;line-height:1.4;}
+  .achv-text b{color:var(--ink);}
+  .achv-date{font-size:10.5px;color:var(--ink-60);margin-top:2px;}
   .shortcut{
     border:1px solid var(--ink-15);padding:22px 18px;background:none;cursor:pointer;
     text-align:left;color:var(--ink);display:flex;flex-direction:column;gap:14px;
@@ -513,6 +522,11 @@
 
     <div class="stat-row" id="statRow">
       <div class="loading-note" style="grid-column:1/-1;padding:14px;"><span class="spinner"></span>Memuat...</div>
+    </div>
+
+    <div id="recentAchievementsWrap">
+      <p class="eyebrow" style="margin-top:34px;">Pencapaian Terbaru</p>
+      <div id="recentAchievements"></div>
     </div>
 
     <div class="home-grid" id="homeShortcuts">
@@ -888,6 +902,7 @@ async function loadPublicData(){
         role: a.role,
         genres: a.genres ? String(a.genres).split(",").map(s=>s.trim()).filter(Boolean) : [],
         foto_profil_url: a.foto_profil_url || "",
+        bio: a.bio || "",
         badges: earned,
         points: levelInfo.points,
         level: levelInfo.level,
@@ -1050,6 +1065,8 @@ function renderBeranda(){
     <div class="stat"><div class="label">Pertemuan Selanjutnya</div><div class="value">${nextMeeting ? "ke-"+nextMeeting.no : "—"}</div></div>
   `;
 
+  renderRecentAchievements();
+
   const shortcuts = [
     { view:"progress", title:"Progress", desc:"Lihat materi & status tiap pertemuan.", icon:`<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="var(--ink)" stroke-width="1.6"/><path d="M12 8 V12 L15 14" stroke="var(--ink)" stroke-width="1.6" fill="none"/></svg>` },
     { view:"anggota", title:"Anggota", desc:"Profil, genre favorit, dan koleksi lencana.", icon:`<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="9" r="4" fill="none" stroke="var(--ink)" stroke-width="1.6"/><path d="M5 20 C5 15.5 8 13.5 12 13.5 C16 13.5 19 15.5 19 20" fill="none" stroke="var(--ink)" stroke-width="1.6"/></svg>` },
@@ -1067,6 +1084,50 @@ function renderBeranda(){
   `).join("");
   document.querySelectorAll(".shortcut").forEach(btn=>{
     btn.addEventListener("click", ()=> document.querySelector(`nav.dial button[data-view="${btn.dataset.view}"]`).click());
+  });
+}
+
+/* Feed "baru saja dapat lencana apa" di Beranda — dikumpulin dari semua
+   klaim yang disetujui di semua anggota, diurutkan dari yang paling baru,
+   dibatasi 5 biar Beranda tetap ringkas. */
+function renderRecentAchievements(){
+  const wrap = document.getElementById("recentAchievementsWrap");
+  const container = document.getElementById("recentAchievements");
+
+  const events = [];
+  DATA.members.forEach(m=>{
+    m.badges.forEach(item=>{
+      const info = DATA.badges.find(b=>b.id===item.id_lencana);
+      if(!info) return;
+      events.push({
+        nama: m.nama,
+        badgeNama: info.nama,
+        rarity: info.rarity,
+        foto_bukti_url: item.foto_bukti_url,
+        tanggal: item.tanggal,
+        _t: parseTanggalIndo(item.tanggal),
+      });
+    });
+  });
+
+  if(!events.length){ wrap.style.display = "none"; return; }
+  wrap.style.display = "";
+
+  events.sort((a,b)=> b._t - a._t);
+  const recent = events.slice(0, 5);
+
+  container.innerHTML = `<div class="achv-list">${recent.map(e=>`
+    <div class="achv-item">
+      <img class="achv-thumb" src="${thumbSize(e.foto_bukti_url,150)}" data-full="${thumbSize(e.foto_bukti_url,1600)}" alt="">
+      <div>
+        <div class="achv-text"><b>${e.nama}</b> baru saja mendapatkan lencana ${RARITY_LABEL[e.rarity] || e.rarity}: <b>${e.badgeNama}</b>!</div>
+        <div class="achv-date">${e.tanggal || ""}</div>
+      </div>
+    </div>
+  `).join("")}</div>`;
+
+  container.querySelectorAll(".achv-thumb").forEach(img=>{
+    img.addEventListener("click", ()=> openImageLightbox(img.dataset.full));
   });
 }
 
@@ -1177,9 +1238,10 @@ function openMemberProfile(member){
 
   document.getElementById("profilBody").innerHTML = `
     ${member.foto_profil_url ? `<img src="${thumbSize(member.foto_profil_url,300)}" class="avatar avatar-lg" style="object-fit:cover;" id="profileAvatarImg">` : `<div class="avatar avatar-lg">${initials(member.nama)}</div>`}
-    <div class="level-pill">Lv.${member.level} · ${member.level_name}</div>
     <div class="modal-name">${member.nama}</div>
     <div class="modal-role">${member.role}</div>
+    ${member.bio ? `<div style="font-size:13px;color:var(--ink-60);font-style:italic;margin:-8px 0 14px;">"${member.bio}"</div>` : ""}
+    <div class="level-pill">Lv.${member.level} · ${member.level_name}</div>
     <div class="modal-section-label">Level & Poin</div>
     <div style="font-size:13px;">${member.points} poin ${member.next_level ? `— <span style="color:var(--ink-60);">${member.points_to_next} poin lagi ke Level ${member.next_level}${member.title_changes_next ? ` <b>(naik gelar jadi ${member.next_level_name}!)</b>` : ""}</span>` : `— <span style="color:var(--ink-60);">Level tertinggi tercapai 🏆</span>`}</div>
     <div class="level-progress-track"><div class="level-progress-fill" style="width:${member.progress_pct}%;"></div></div>
@@ -1643,6 +1705,11 @@ function openEditProfileForm(member){
     <button class="btn ghost small" id="backToProfile2">← Batal, kembali ke profil</button>
     <div class="modal-section-label" style="margin-top:16px;">Edit Profil</div>
     <div class="field">
+      <label>Bio singkat</label>
+      <input type="text" id="bioInput" maxlength="80" placeholder="Satu kalimat singkat tentang kamu" value="${(member.bio || "").replace(/"/g,"&quot;")}">
+      <div class="field-hint">Maksimal 80 karakter.</div>
+    </div>
+    <div class="field">
       <label>Genre favorit</label>
       <div class="checkbox-grid" id="genreChips"></div>
       <div class="field-hint">Klik untuk pilih/batalkan.</div>
@@ -1701,7 +1768,7 @@ function openEditProfileForm(member){
   document.getElementById("saveProfileBtn").addEventListener("click", async ()=>{
     const msg = document.getElementById("profileMsg");
     msg.className = "form-msg show"; msg.textContent = "Menyimpan...";
-    const payload = { action:"updateProfile", username: currentUser.username, pin: currentUser.pin, genres: Array.from(selected) };
+    const payload = { action:"updateProfile", username: currentUser.username, pin: currentUser.pin, genres: Array.from(selected), bio: document.getElementById("bioInput").value.trim() };
     if(newPhotoBase64) payload.foto_base64 = newPhotoBase64;
     try{
       const result = await apiPost(payload);
